@@ -60,3 +60,14 @@ test('health check marks movement checks N/A after a revert',()=>{
  const r=receipt([log()]);r.status='0x0';const h=assess(analyze(r),{chainId:5042,sourceMode:'live'});
  assert.equal(h.verdict,'review');assert.equal(h.checks.find(c=>c.id==='canonical-stream').status,'na');
 });
+for(const [i,expected] of [
+ [4,{system:1,erc20:0,movements:1,transit:0,recipients:1}],
+ [5,{system:1,erc20:1,movements:1,transit:0,recipients:1}],
+ [6,{system:4,erc20:5,movements:4,transit:2,recipients:2}],
+ [7,{system:6,erc20:6,movements:6,transit:1,recipients:4}],
+ [8,{system:3,erc20:0,movements:3,transit:2,recipients:1}],
+]) test(`mainnet validation case ${i} matches its independently derived profile`,()=>{
+ const f=JSON.parse(readFileSync(new URL(`../fixtures/live-${i}.json`,import.meta.url)));const x=analyze(f.receipt);
+ assert.equal(f.chainId,5042);assert.match(f.source,/^https:\/\/rpc\.mainnet\.arc\.io/);
+ assert.deepEqual({system:x.systemLogCount,erc20:x.erc20LogCount,movements:x.movements.length,transit:x.netEffects.transitCount,recipients:x.netEffects.recipientCount},expected);
+});

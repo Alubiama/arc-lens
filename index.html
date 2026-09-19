@@ -20,6 +20,7 @@
     </p>
     <nav class="masthead__nav" aria-label="Section">
       <a href="#inspect">Inspect</a>
+      <a href="#cases">Cases</a>
       <a href="#evidence">Evidence</a>
       <a href="#about">About</a>
     </nav>
@@ -79,6 +80,19 @@
   </section>
 
   <section id="result-region" class="result-region" aria-label="Transaction result" hidden></section>
+
+  <section id="cases" class="panel case-panel" aria-labelledby="cases-title">
+    <p class="kicker">{ VERIFIED ON ARC MAINNET }</p>
+    <h2 id="cases-title" class="panel__title">Five receipts. Five integration shapes.</h2>
+    <p class="prose">Open any case through the live public RPC. Each transaction is also stored as a dated fixture and tested from raw receipt evidence.</p>
+    <ul class="case-grid">
+      <li><a href="?tx=0x3c138bf5e5855e33bfd0a864bf291703747077aefeccd2f712a065575f3c0fa3"><strong>Native transfer</strong><span>1 system · 0 ERC-20</span></a></li>
+      <li><a href="?tx=0x308703f96bb8a6ba179b8d15b4c8c92f0179f64932fe7fd71c5668a38ce2af38"><strong>ERC-20 interface</strong><span>1 system · 1 alternative</span></a></li>
+      <li><a href="?tx=0xbcd8818fa6d1fcf335417a5d32025331f88d2e51b578c997f379d0bcf6f88aa4"><strong>Mixed-stream route</strong><span>4 system · 5 alternative</span></a></li>
+      <li><a href="?tx=0xec0815ffe135eb703e657cd876f7848d0cca4422cef9473561318565a4cd07ec"><strong>Multi-recipient payout</strong><span>6 movements · 4 recipients</span></a></li>
+      <li><a href="?tx=0x38176eb72a6ded86bb6e60e3c24a21ec6d3c59c0b63d3df9b230a5bdab6abd69"><strong>System-only multi-hop</strong><span>3 movements · 2 transit</span></a></li>
+    </ul>
+  </section>
 
   <section id="evidence" class="panel panel--muted" aria-labelledby="evidence-title">
     <h2 id="evidence-title" class="panel__title">Why two event streams are not two payments</h2>

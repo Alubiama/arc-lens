@@ -27,6 +27,8 @@ The browser connects directly to `https://rpc.mainnet.arc.io`, verifies chain ID
 6. Review the **Integration health check**: deterministic `PASS / WARN / N/A` checks expose the verified network, execution status, canonical stream, duplicate-stream handling, fee separation and evidence source.
 7. **Load captured example** works from a saved public mainnet receipt and has a stable `?sample=captured` URL. It is visibly labelled as a snapshot, never a live result.
 
+Five additional public mainnet shapes are listed in [VALIDATION_CASES.md](VALIDATION_CASES.md) and linked directly from the interface.
+
 Example: [public mainnet transaction](https://explorer.arc.io/tx/0xb147ec455818b74b6511e905abc6f56e15c189432f3c0e98b397108e6916d8e3).
 
 ## Semantics and limits
@@ -42,7 +44,7 @@ Example: [public mainnet transaction](https://explorer.arc.io/tx/0xb147ec455818b
 
 ## Evidence and tests
 
-20 deterministic tests cover precision/dust, dual streams, repeated equal payments, reverts, malformed logs, duplicate indices, missing fields, mint/burn, health-check states and three captured public mainnet receipts. Fixtures carry their source and capture date. Passing fixtures is not proof that every possible transaction shape is supported.
+25 deterministic tests cover precision/dust, dual streams, repeated equal payments, reverts, malformed logs, duplicate indices, missing fields, mint/burn, health-check states and eight captured public mainnet receipts. Fixtures carry their source and capture date. Passing fixtures is not proof that every possible transaction shape is supported.
 
 ## Sources
 
