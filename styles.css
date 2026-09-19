@@ -1,4 +1,4 @@
-/* Arc Lens — warm-paper editorial inspector. No frameworks, no webfonts, no CDN. */
+/* Arc Lens base layout. Brand styling and locally hosted fonts: arc-theme.css. */
 
 :root {
   --paper:      #f7f1e6;

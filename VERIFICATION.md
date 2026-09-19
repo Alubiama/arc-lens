@@ -19,3 +19,7 @@ Public-source research and application drafting were also delegated. A worker's 
 ## Boundary
 
 The app reads public Arc mainnet data; it does not deploy a smart contract. Passing these checks does not establish grant eligibility, selection, exhaustive transaction coverage, customer demand, or a financial/security audit.
+
+## Visual update — 2026-09-19
+
+Inspected the desktop interface at 1280 px and the captured-result screen at 390 px in the Codex browser. Mobile document width equals viewport width (390 px); the captured example renders 8 canonical movements and fee 0.059403855 USDC. This update changes presentation and local font assets only.

@@ -48,3 +48,7 @@ Example: [public mainnet transaction](https://explorer.arc.io/tx/0xb147ec455818b
 - [Mainnet RPC parameters](https://docs.arc.io/arc/references/rpc-endpoints)
 
 Independent project. Not affiliated with or endorsed by Circle or Arc. Built with AI assistance and independently reviewed; see [verification](VERIFICATION.md) for the actual test boundary.
+
+## Visual styling
+
+The interface adapts the visual language observed on [arc.io](https://www.arc.io/) on 2026-09-19: pale blue gradients, navy typography, thin orbital lines and black buttons. This is an independent design adaptation, not an official Arc brand certification. DM Sans and Space Grotesk are hosted locally; their OFL licenses are included in `assets/fonts/`.
