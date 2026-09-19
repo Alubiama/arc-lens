@@ -24,7 +24,8 @@ The browser connects directly to `https://rpc.mainnet.arc.io`, verifies chain ID
 3. Inspect every from/to/amount/log index. Equal-value movements are preserved, not merged heuristically.
 4. Review **Net USDC effects** to separate net sources and recipients from zero-net transit addresses. This summary is derived only from canonical movements; network fee remains separate.
 5. Copy a shareable `?tx=` URL or expand the raw receipt and download a JSON bundle containing the receipt, analysis, network and retrieval provenance.
-6. **Load captured example** works from a saved public mainnet receipt and has a stable `?sample=captured` URL. It is visibly labelled as a snapshot, never a live result.
+6. Review the **Integration health check**: deterministic `PASS / WARN / N/A` checks expose the verified network, execution status, canonical stream, duplicate-stream handling, fee separation and evidence source.
+7. **Load captured example** works from a saved public mainnet receipt and has a stable `?sample=captured` URL. It is visibly labelled as a snapshot, never a live result.
 
 Example: [public mainnet transaction](https://explorer.arc.io/tx/0xb147ec455818b74b6511e905abc6f56e15c189432f3c0e98b397108e6916d8e3).
 
@@ -41,7 +42,7 @@ Example: [public mainnet transaction](https://explorer.arc.io/tx/0xb147ec455818b
 
 ## Evidence and tests
 
-12 deterministic tests cover precision/dust, dual streams, repeated equal payments, reverts, malformed logs, duplicate indices, missing fields, mint/burn and three captured public mainnet receipts. Fixtures carry their source and capture date. Passing fixtures is not proof that every possible transaction shape is supported.
+20 deterministic tests cover precision/dust, dual streams, repeated equal payments, reverts, malformed logs, duplicate indices, missing fields, mint/burn, health-check states and three captured public mainnet receipts. Fixtures carry their source and capture date. Passing fixtures is not proof that every possible transaction shape is supported.
 
 ## Sources
 

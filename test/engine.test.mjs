@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {analyzeReceipt as analyze,formatUnits,summarizeMovementEffects,SYSTEM_EMITTER as S,USDC as U,TRANSFER_TOPIC as T} from '../engine.mjs';
+import {analyzeReceipt as analyze,assessReceiptHealth as assess,formatUnits,summarizeMovementEffects,SYSTEM_EMITTER as S,USDC as U,TRANSFER_TOPIC as T} from '../engine.mjs';
 const hash='0x'+'ab'.repeat(32), a='0x'+'11'.repeat(20),b='0x'+'22'.repeat(20);
 const topic=x=>'0x'+x.slice(2).padStart(64,'0');
 const log=(i=0,amount=10n**18n,emitter=S)=>({logIndex:'0x'+i.toString(16),address:emitter,topics:[T,topic(a),topic(b)],data:'0x'+amount.toString(16).padStart(64,'0'),removed:false});
@@ -41,3 +41,22 @@ test('mint and burn affect supply without treating zero address as a participant
  assert.equal(x.participants.length,1);assert.equal(x.participants[0].net,'+0.000000000000000003');assert.equal(x.supply.net,'+0.000000000000000003');
 });
 test('reverted receipts expose no net effects',()=>{const r=receipt([log()]);r.status='0x0';const x=analyze(r);assert.equal(x.netEffects.participants.length,0);assert.equal(x.netEffects.supply.net,'0');});
+test('health check passes applicable mainnet mixed-stream evidence',()=>{
+ const h=assess(analyze(receipt([log(),log(1,1000000n,U)])),{chainId:5042,sourceMode:'live'});
+ assert.equal(h.verdict,'pass');assert.equal(h.counts.pass,6);assert.equal(h.counts.warn,0);
+ assert.equal(h.checks.find(c=>c.id==='alternative-stream').status,'pass');
+});
+test('health check uses N/A when an alternative stream is absent',()=>{
+ const h=assess(analyze(receipt([log()])),{chainId:5042,sourceMode:'captured'});
+ assert.equal(h.verdict,'pass');assert.equal(h.checks.find(c=>c.id==='alternative-stream').status,'na');
+});
+test('health check warns on incomplete stream evidence and unverified chain',()=>{
+ const h=assess(analyze(receipt([log(0,1000000n,U)])),{chainId:1,sourceMode:'unknown'});
+ assert.equal(h.verdict,'review');assert.equal(h.counts.warn,4);
+ assert.equal(h.checks.find(c=>c.id==='canonical-stream').status,'warn');
+ assert.equal(h.checks.find(c=>c.id==='arc-mainnet').status,'warn');
+});
+test('health check marks movement checks N/A after a revert',()=>{
+ const r=receipt([log()]);r.status='0x0';const h=assess(analyze(r),{chainId:5042,sourceMode:'live'});
+ assert.equal(h.verdict,'review');assert.equal(h.checks.find(c=>c.id==='canonical-stream').status,'na');
+});

@@ -225,6 +225,58 @@ export function analyzeReceipt(receipt) {
   };
 }
 
+export function assessReceiptHealth(report, context = {}) {
+  if (!report || typeof report !== 'object') throw new Error('assessReceiptHealth: report is required');
+  const chainId = context.chainId;
+  const sourceMode = context.sourceMode;
+  const checks = [];
+  const add = (id, label, status, detail, observed, source) => checks.push({id, label, status, detail, observed, source});
+
+  add(
+    'arc-mainnet', 'Arc mainnet', chainId === 5042 ? 'pass' : 'warn',
+    chainId === 5042 ? 'The source was verified as Arc chain 5042.' : 'Arc chain 5042 was not verified; no mainnet claim should be made.',
+    chainId ?? null, 'eth_chainId or captured fixture chainId'
+  );
+  add(
+    'execution', 'Execution completed', report.status === 'success' ? 'pass' : 'warn',
+    report.status === 'success' ? 'The receipt status is successful.' : 'The transaction reverted; no completed movements are reported.',
+    report.status, 'receipt.status'
+  );
+  add(
+    'canonical-stream', 'Canonical USDC stream',
+    report.status === 'reverted' ? 'na' : report.systemLogCount > 0 ? 'pass' : 'warn',
+    report.status === 'reverted' ? 'Not applicable to a reverted execution.' : report.systemLogCount > 0 ? `${report.systemLogCount} system-emitter Transfer event${report.systemLogCount === 1 ? '' : 's'} decoded at 18 decimals.` : 'No canonical system-emitter Transfer event was found in this receipt.',
+    report.systemLogCount, 'receipt.logs[].address + topics + data'
+  );
+  add(
+    'alternative-stream', 'Alternative stream separated',
+    report.erc20LogCount === 0 ? 'na' : report.systemLogCount > 0 ? 'pass' : 'warn',
+    report.erc20LogCount === 0 ? 'No ERC-20 USDC Transfer records were present.' : report.systemLogCount > 0 ? `${report.erc20LogCount} ERC-20 record${report.erc20LogCount === 1 ? '' : 's'} kept as evidence and excluded from canonical movement totals.` : 'ERC-20 records exist without canonical system events; evidence may be incomplete.',
+    report.erc20LogCount, 'receipt.logs[].address'
+  );
+  add(
+    'fee-separated', 'Fee kept separate', 'pass',
+    'Gas fee was calculated exactly and excluded from participant net effects.',
+    `${report.fee} USDC`, 'receipt.gasUsed × receipt.effectiveGasPrice'
+  );
+  add(
+    'evidence-source', 'Evidence source identified',
+    sourceMode === 'live' || sourceMode === 'captured' ? 'pass' : 'warn',
+    sourceMode === 'live' ? 'Live RPC retrieval and a transaction-specific share URL identify the evidence.' : sourceMode === 'captured' ? 'The result is explicitly labelled as a captured snapshot.' : 'The evidence source mode was not identified.',
+    sourceMode ?? null, 'analysis source metadata'
+  );
+
+  return {
+    verdict: checks.some(check => check.status === 'warn') ? 'review' : 'pass',
+    counts: {
+      pass: checks.filter(check => check.status === 'pass').length,
+      warn: checks.filter(check => check.status === 'warn').length,
+      na: checks.filter(check => check.status === 'na').length,
+    },
+    checks,
+  };
+}
+
 // --- validation helpers ------------------------------------------------------------
 
 function validateHash(h) {

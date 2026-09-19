@@ -1,4 +1,4 @@
-import {analyzeReceipt} from './engine.mjs';
+import {analyzeReceipt,assessReceiptHealth} from './engine.mjs';
 const RPC='https://rpc.mainnet.arc.io';
 const EXAMPLE='0xb147ec455818b74b6511e905abc6f56e15c189432f3c0e98b397108e6916d8e3';
 const $=id=>document.getElementById(id);
@@ -40,6 +40,13 @@ function renderStreamProof(report){
  const copy=node('p',`${report.systemLogCount} system events + ${report.erc20LogCount} ERC-20 records. Arc Lens counts the verified system stream once instead of reporting ${total} movements.`,'stream-proof__copy');
  proof.append(before,arrow,after,copy);return proof;
 }
+function renderHealth(health){
+ const section=node('section',undefined,'health');section.setAttribute('aria-labelledby','health-title');
+ const heading=node('div',undefined,'health__heading');const copy=node('div');const title=node('h3','Integration health check','health__title');title.id='health-title';copy.append(node('p','DETERMINISTIC RECEIPT CHECKS','kicker'),title);heading.append(copy,node('strong',health.verdict==='pass'?'PASS':'REVIEW',`health__verdict health__verdict--${health.verdict}`));section.append(heading);
+ section.append(node('p','Checks describe the available receipt evidence. They do not certify safety, compliance or accounting correctness.','health__note'));
+ const list=node('ul',undefined,'health__list');
+ for(const check of health.checks){const item=node('li',undefined,'health__item');const badge=node('span',check.status==='na'?'N/A':check.status.toUpperCase(),`health__badge health__badge--${check.status}`);const body=node('div');body.append(node('strong',check.label),node('p',check.detail),node('code',check.source));item.append(badge,body);list.append(item);}section.append(list);return section;
+}
 function setBusy(v){busy=v;buttons.forEach(b=>b.disabled=v);input.disabled=v;form.setAttribute('aria-busy',String(v));}
 async function rpc(method,params,signal){
  const response=await fetch(RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),signal});
@@ -49,8 +56,9 @@ async function rpc(method,params,signal){
 }
 function render(receipt,source){
  const report=analyzeReceipt(receipt);
+ const health=assessReceiptHealth(report,{chainId:5042,sourceMode:source.mode});
  const shareUrl=shareURL(source.mode,report.hash);history.replaceState(null,'',shareUrl);
- bundle={tool:'Arc Lens',version:'0.2.0',chainId:5042,source:{...source,shareUrl},analysis:report,receipt};
+ bundle={tool:'Arc Lens',version:'0.3.0',chainId:5042,source:{...source,shareUrl},health,analysis:report,receipt};
  result.replaceChildren();result.hidden=false;
  const header=node('div',undefined,'result-heading');header.append(node('p',source.mode==='live'?'FETCHED FROM ARC MAINNET':'CAPTURED SNAPSHOT','kicker'),link('Open in explorer ↗',`https://explorer.arc.io/tx/${report.hash}`));result.append(header);
  result.append(node('h2',report.status==='success'?'The receipt, made readable.':'Transaction reverted.','result-title'));
@@ -61,6 +69,7 @@ function render(receipt,source){
  for(const warning of report.warnings)result.append(node('p',warning,'warning'));
  const proof=renderStreamProof(report);if(proof)result.append(proof);
  const stream=node('div',undefined,'stream-note');stream.append(node('strong',`${report.systemLogCount} system logs · ${report.erc20LogCount} ERC-20 logs`),node('p','Only system-emitter transfers count as movements. ERC-20 logs are another view, not extra money. No equal-amount transfers are merged.'));result.append(stream);
+ result.append(renderHealth(health));
  const effects=renderNetEffects(report);if(effects)result.append(effects);
  result.append(node('h3','Canonical USDC movements'));
  if(!report.movements.length)result.append(node('p',report.status==='reverted'?'No completed USDC movements: execution reverted.':'No canonical USDC movements were found in this receipt. Other assets and approvals are outside this view.','empty-result'));
