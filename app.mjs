@@ -8,6 +8,16 @@ let busy=false, bundle=null;
 function node(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
 function link(text,url){const a=node('a',text);a.href=url;a.target='_blank';a.rel='noopener noreferrer';return a;}
 function metric(label,value){const e=node('div',undefined,'metric');e.append(node('span',label,'label'),node('strong',value));return e;}
+function renderStreamProof(report){
+ if(report.status!=='success'||!report.systemLogCount||!report.erc20LogCount)return null;
+ const total=report.systemLogCount+report.erc20LogCount;
+ const proof=node('section',undefined,'stream-proof');proof.setAttribute('aria-label','Double-counting check');
+ const before=node('div',undefined,'stream-proof__number');before.append(node('span','TRANSFER EVENT RECORDS','label'),node('strong',String(total)));
+ const arrow=node('span','→','stream-proof__arrow');arrow.setAttribute('aria-hidden','true');
+ const after=node('div',undefined,'stream-proof__number stream-proof__number--answer');after.append(node('span','CANONICAL MOVEMENTS','label'),node('strong',String(report.movements.length)));
+ const copy=node('p',`${report.systemLogCount} system events + ${report.erc20LogCount} ERC-20 records. Arc Lens counts the verified system stream once instead of reporting ${total} movements.`,'stream-proof__copy');
+ proof.append(before,arrow,after,copy);return proof;
+}
 function setBusy(v){busy=v;buttons.forEach(b=>b.disabled=v);input.disabled=v;form.setAttribute('aria-busy',String(v));}
 async function rpc(method,params,signal){
  const response=await fetch(RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),signal});
@@ -26,6 +36,7 @@ function render(receipt,source){
  const metrics=node('div',undefined,'metrics');metrics.append(metric('RESULT',report.status==='success'?'Success':'Reverted'),metric('USDC MOVEMENTS',String(report.movements.length)),metric('NETWORK FEE',`${report.fee} USDC`));result.append(metrics);
  result.append(node('p','Fee = gas used × effective gas price, expressed in USDC. It is separate from transfers and can still be charged when execution reverts.','hint'));
  for(const warning of report.warnings)result.append(node('p',warning,'warning'));
+ const proof=renderStreamProof(report);if(proof)result.append(proof);
  const stream=node('div',undefined,'stream-note');stream.append(node('strong',`${report.systemLogCount} system logs · ${report.erc20LogCount} ERC-20 logs`),node('p','Only system-emitter transfers count as movements. ERC-20 logs are another view, not extra money. No equal-amount transfers are merged.'));result.append(stream);
  result.append(node('h3','Canonical USDC movements'));
  if(!report.movements.length)result.append(node('p',report.status==='reverted'?'No completed USDC movements: execution reverted.':'No canonical USDC movements were found in this receipt. Other assets and approvals are outside this view.','empty-result'));

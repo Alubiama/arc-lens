@@ -1,6 +1,6 @@
 # Arc Lens
 
-**One transaction. Every movement.** A small, read-only Arc mainnet USDC receipt explainer.
+**See the movement. Skip the duplicate.** A small, read-only Arc mainnet USDC receipt debugger for payment integrations, indexers and transaction history.
 
 Arc has two event streams for USDC. A transfer through the ERC-20 interface can appear twice: once in the native system stream (18 decimals), once in the ERC-20 stream (6 decimals). Arc Lens exposes that distinction instead of counting both as money moved.
 
@@ -20,6 +20,7 @@ The browser connects directly to `https://rpc.mainnet.arc.io`, verifies chain ID
 
 1. Click **Try mainnet example** for a current RPC retrieval of a known mined transaction.
 2. The example has 8 system-emitter movements and 4 ERC-20 logs: 8 canonical movements, not 12. The fee is **0.059403855 USDC**, accounted for separately.
+   The result renders this as a visible `12 event records → 8 canonical movements` check so the core failure mode is reproducible at a glance.
 3. Inspect every from/to/amount/log index. Equal-value movements are preserved, not merged heuristically.
 4. Expand the raw receipt or download a JSON bundle containing the receipt, analysis, network and retrieval provenance.
 5. **Load captured example** works from a saved public mainnet receipt. It is visibly labelled as a snapshot, never a live result.

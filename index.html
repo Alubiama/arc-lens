@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Arc Lens — One transaction. Every movement.</title>
-<meta name="description" content="Arc Lens is an independent, read-only tool that explains a single Arc transaction: status, fee, and canonical USDC movements. No wallet, no signing.">
+<title>Arc Lens — Arc USDC receipt debugger</title>
+<meta name="description" content="Arc Lens shows which Arc USDC receipt events are canonical movements and which are an alternative ERC-20 view, preventing double-counting. No wallet, no signing.">
 <link rel="stylesheet" href="./styles.css">
 <link rel="stylesheet" href="./arc-theme.css">
 </head>
@@ -16,7 +16,7 @@
     <p class="brand">
       <span class="brand__mark" aria-hidden="true">◆</span>
       <span class="brand__name">Arc&nbsp;Lens</span>
-      <span class="brand__tag">read-only inspector</span>
+      <span class="brand__tag">USDC receipt debugger</span>
     </p>
     <nav class="masthead__nav" aria-label="Section">
       <a href="#inspect">Inspect</a>
@@ -29,13 +29,14 @@
 <main id="main" class="wrap">
 
   <section class="hero" aria-labelledby="hero-title">
-    <p class="kicker">{ ARC MAINNET · USDC EXPLORER }</p>
-    <h1 id="hero-title" class="hero__title">One transaction.<br>Every movement.</h1>
+    <p class="kicker">{ ARC MAINNET · RECEIPT DEBUGGER }</p>
+    <h1 id="hero-title" class="hero__title">See the movement.<br>Skip the duplicate.</h1>
     <p class="hero__lede">
-      Paste a transaction hash and Arc&nbsp;Lens reads the receipt from a public Arc RPC,
-      then explains <em>what actually moved</em>: status, fee, and every canonical USDC
-      movement — with the raw evidence kept in view.
+      Arc can represent one USDC transfer in two event streams. Paste a transaction hash
+      and Arc&nbsp;Lens separates canonical movements from the alternative ERC-20 view, so
+      payment integrations do not count the same money twice.
     </p>
+    <p class="hero__audience">For developers debugging Arc payments, indexers and transaction history.</p>
     <ul class="hero__facts">
       <li><strong>Read-only.</strong> No wallet, no signing, no keys.</li>
       <li><strong>One input.</strong> Only the transaction hash is required.</li>
