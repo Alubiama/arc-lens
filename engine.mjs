@@ -277,6 +277,12 @@ export function assessReceiptHealth(report, context = {}) {
   };
 }
 
+export function movementMatchesAddress(movement, address) {
+  if (!movement || typeof movement !== 'object') throw new Error('movementMatchesAddress: movement is required');
+  const selected = normalizeAddress(address, 'selected address');
+  return normalizeAddress(movement.from, 'movement.from') === selected || normalizeAddress(movement.to, 'movement.to') === selected;
+}
+
 // --- validation helpers ------------------------------------------------------------
 
 function validateHash(h) {

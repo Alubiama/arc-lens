@@ -1,10 +1,10 @@
-import {analyzeReceipt,assessReceiptHealth} from './engine.mjs';
+import {analyzeReceipt,assessReceiptHealth,movementMatchesAddress} from './engine.mjs';
 const RPC='https://rpc.mainnet.arc.io';
 const EXAMPLE='0xb147ec455818b74b6511e905abc6f56e15c189432f3c0e98b397108e6916d8e3';
 const $=id=>document.getElementById(id);
 const form=$('tx-form'),input=$('tx-hash'),status=$('status'),result=$('result-region'),error=$('tx-error');
 const buttons=[...form.querySelectorAll('button')];
-let busy=false, bundle=null;
+let busy=false, bundle=null,selectedAddress=null,lastAddressTrigger=null;
 function node(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
 function link(text,url){const a=node('a',text);a.href=url;a.target='_blank';a.rel='noopener noreferrer';return a;}
 function metric(label,value){const e=node('div',undefined,'metric');e.append(node('span',label,'label'),node('strong',value));return e;}
@@ -15,9 +15,12 @@ async function copyText(text){
  const area=node('textarea');area.value=text;area.setAttribute('readonly','');area.style.position='fixed';area.style.opacity='0';document.body.append(area);area.select();
  const copied=document.execCommand('copy');area.remove();if(!copied)throw Error('Copy failed');
 }
+function addressButton(address){const button=node('button',shortAddress(address),'address-chip');button.type='button';button.title=address;button.dataset.address=address;button.setAttribute('aria-pressed','false');button.addEventListener('click',()=>toggleAddress(address,button));return button;}
+function clearAddressFocus(returnFocus=false){const target=lastAddressTrigger;selectedAddress=null;result.querySelectorAll('[data-address]').forEach(el=>el.setAttribute('aria-pressed','false'));result.querySelectorAll('[data-involves]').forEach(el=>el.classList.remove('is-dimmed','is-highlighted'));const summary=$('address-focus-summary');if(summary){summary.hidden=true;summary.replaceChildren();}lastAddressTrigger=null;if(returnFocus&&target?.isConnected)target.focus();}
+function toggleAddress(address,trigger){if(selectedAddress===address){clearAddressFocus();return;}selectedAddress=address;lastAddressTrigger=trigger;result.querySelectorAll('[data-address]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.address===address)));let count=0;result.querySelectorAll('.movement-flow').forEach(row=>{const matches=row.dataset.involves.split(' ').includes(address);row.classList.toggle('is-highlighted',matches);row.classList.toggle('is-dimmed',!matches);if(matches)count++;});result.querySelectorAll('.effect-row').forEach(row=>{const matches=row.dataset.involves===address;row.classList.toggle('is-highlighted',matches);row.classList.toggle('is-dimmed',!matches);});const summary=$('address-focus-summary');summary.hidden=false;summary.replaceChildren();const copy=node('div');copy.append(node('span','ADDRESS IN FOCUS','label'),node('code',address),node('strong',`${count} canonical ${count===1?'movement':'movements'}`));const clear=node('button','Clear','btn btn--ghost');clear.type='button';clear.addEventListener('click',()=>clearAddressFocus(true));summary.append(copy,clear);}
 function effectRow(effect){
  const row=node('li',undefined,`effect-row effect-row--${effect.role}`);
- const identity=node('div');identity.append(node('span',effect.role.toUpperCase(),'label'),node('code',shortAddress(effect.address),'effect-address'));identity.querySelector('code').title=effect.address;
+ row.dataset.involves=effect.address;const identity=node('div');identity.append(node('span',effect.role.toUpperCase(),'label'),addressButton(effect.address));
  const values=node('div',undefined,'effect-values');values.append(node('strong',`${effect.net} USDC`),node('span',`in ${effect.inflow} · out ${effect.outflow}`));row.append(identity,values);return row;
 }
 function renderNetEffects(report){
@@ -45,7 +48,13 @@ function renderHealth(health){
  const heading=node('div',undefined,'health__heading');const copy=node('div');const title=node('h3','Integration health check','health__title');title.id='health-title';copy.append(node('p','DETERMINISTIC RECEIPT CHECKS','kicker'),title);heading.append(copy,node('strong',health.verdict==='pass'?'PASS':'REVIEW',`health__verdict health__verdict--${health.verdict}`));section.append(heading);
  section.append(node('p','Checks describe the available receipt evidence. They do not certify safety, compliance or accounting correctness.','health__note'));
  const list=node('ul',undefined,'health__list');
- for(const check of health.checks){const item=node('li',undefined,'health__item');const badge=node('span',check.status==='na'?'N/A':check.status.toUpperCase(),`health__badge health__badge--${check.status}`);const body=node('div');body.append(node('strong',check.label),node('p',check.detail),node('code',check.source));item.append(badge,body);list.append(item);}section.append(list);return section;
+ for(const check of health.checks){const item=node('li',undefined,'health__item');const badge=node('span',check.status==='na'?'N/A':check.status.toUpperCase(),`health__badge health__badge--${check.status}`);const details=node('details',undefined,'health__detail');details.append(node('summary',check.label),node('p',check.detail),node('code',check.source));item.append(badge,details);list.append(item);}section.append(list);return section;
+}
+function renderMovementMap(report){
+ const section=node('section',undefined,'movement-map');section.setAttribute('aria-labelledby','movement-map-title');section.append(node('p','CANONICAL MOVEMENT MAP','kicker'));const title=node('h3','Follow the money','movement-map__title');title.id='movement-map-title';section.append(title,node('p','Select any address to isolate every movement it touches. Select it again or press Escape to clear.','movement-map__hint'));
+ const summary=node('div',undefined,'address-focus');summary.id='address-focus-summary';summary.hidden=true;summary.setAttribute('role','status');section.append(summary);
+ if(!report.movements.length){section.append(node('p',report.status==='reverted'?'No completed USDC movements: execution reverted.':'No decoded addresses in this receipt.','empty-result'));return section;}
+ const list=node('ol',undefined,'movement-map__list');report.movements.forEach(m=>{const row=node('li',undefined,'movement-flow');row.dataset.involves=`${m.from} ${m.to}`;const center=node('div',undefined,'movement-flow__center');center.append(node('strong',`${m.amount} USDC`),node('span','→','movement-flow__arrow'),node('span',`${m.kind.toUpperCase()} · LOG ${m.logIndex}`,'label'));row.append(addressButton(m.from),center,addressButton(m.to));list.append(row);});section.append(list);return section;
 }
 function setBusy(v){busy=v;buttons.forEach(b=>b.disabled=v);input.disabled=v;form.setAttribute('aria-busy',String(v));}
 async function rpc(method,params,signal){
@@ -55,10 +64,11 @@ async function rpc(method,params,signal){
  if(!Object.hasOwn(data,'result'))throw Error('Arc RPC returned an incomplete response.');return data.result;
 }
 function render(receipt,source){
+ clearAddressFocus();
  const report=analyzeReceipt(receipt);
  const health=assessReceiptHealth(report,{chainId:5042,sourceMode:source.mode});
  const shareUrl=shareURL(source.mode,report.hash);history.replaceState(null,'',shareUrl);
- bundle={tool:'Arc Lens',version:'0.3.0',chainId:5042,source:{...source,shareUrl},health,analysis:report,receipt};
+ bundle={tool:'Arc Lens',version:'0.4.0',chainId:5042,source:{...source,shareUrl},health,analysis:report,receipt};
  result.replaceChildren();result.hidden=false;
  const header=node('div',undefined,'result-heading');header.append(node('p',source.mode==='live'?'FETCHED FROM ARC MAINNET':'CAPTURED SNAPSHOT','kicker'),link('Open in explorer ↗',`https://explorer.arc.io/tx/${report.hash}`));result.append(header);
  result.append(node('h2',report.status==='success'?'The receipt, made readable.':'Transaction reverted.','result-title'));
@@ -71,10 +81,7 @@ function render(receipt,source){
  const stream=node('div',undefined,'stream-note');stream.append(node('strong',`${report.systemLogCount} system logs · ${report.erc20LogCount} ERC-20 logs`),node('p','Only system-emitter transfers count as movements. ERC-20 logs are another view, not extra money. No equal-amount transfers are merged.'));result.append(stream);
  result.append(renderHealth(health));
  const effects=renderNetEffects(report);if(effects)result.append(effects);
- result.append(node('h3','Canonical USDC movements'));
- if(!report.movements.length)result.append(node('p',report.status==='reverted'?'No completed USDC movements: execution reverted.':'No canonical USDC movements were found in this receipt. Other assets and approvals are outside this view.','empty-result'));
- const list=node('ol',undefined,'movements');
- report.movements.forEach(m=>{const row=node('li');const top=node('div',undefined,'movement-top');top.append(node('span',`${m.kind.toUpperCase()} · LOG ${m.logIndex}`,'label'),node('strong',`${m.amount} USDC`));row.append(top,node('p',`From  ${m.from}`,'address'),node('p',`To      ${m.to}`,'address'));list.append(row);});result.append(list);
+ result.append(renderMovementMap(report));
  const details=node('details',undefined,'raw');details.append(node('summary','Inspect the raw RPC receipt'),node('pre',JSON.stringify(receipt,null,2)));result.append(details);
  const actions=node('div',undefined,'evidence-actions');const download=node('button','Download evidence JSON','btn btn--primary');download.type='button';download.addEventListener('click',()=>{const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=node('a');a.href=url;a.download=`arc-lens-${report.hash.slice(2,14)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});const copy=node('button','Copy shareable link','btn btn--ghost');copy.type='button';copy.addEventListener('click',async()=>{try{await copyText(shareUrl);status.textContent='Shareable link copied.';}catch{status.textContent='Could not copy the link. Copy it from the address bar.';}});actions.append(download,copy,link('Read Arc’s event specification ↗','https://docs.arc.io/arc/references/usdc-system-events'));result.append(actions);
 }
@@ -105,3 +112,4 @@ $('btn-example').addEventListener('click',()=>{input.value=EXAMPLE;load('live');
 $('btn-captured').addEventListener('click',()=>load('captured'));
 const params=new URLSearchParams(window.location.search);const linkedTx=params.get('tx');
 if(linkedTx!==null){input.value=linkedTx;load('live');}else if(params.get('sample')==='captured')load('captured');
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&selectedAddress){event.preventDefault();clearAddressFocus(true);}});

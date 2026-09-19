@@ -23,9 +23,10 @@ The browser connects directly to `https://rpc.mainnet.arc.io`, verifies chain ID
    The result renders this as a visible `12 event records → 8 canonical movements` check so the core failure mode is reproducible at a glance.
 3. Inspect every from/to/amount/log index. Equal-value movements are preserved, not merged heuristically.
 4. Review **Net USDC effects** to separate net sources and recipients from zero-net transit addresses. This summary is derived only from canonical movements; network fee remains separate.
-5. Copy a shareable `?tx=` URL or expand the raw receipt and download a JSON bundle containing the receipt, analysis, network and retrieval provenance.
-6. Review the **Integration health check**: deterministic `PASS / WARN / N/A` checks expose the verified network, execution status, canonical stream, duplicate-stream handling, fee separation and evidence source.
-7. **Load captured example** works from a saved public mainnet receipt and has a stable `?sample=captured` URL. It is visibly labelled as a snapshot, never a live result.
+5. Use **Follow the money**: select an address to highlight every canonical movement it touches; select it again, press Escape or use Clear to reset.
+6. Copy a shareable `?tx=` URL or expand the raw receipt and download a JSON bundle containing the receipt, analysis, network and retrieval provenance.
+7. Review the **Integration health check**: compact deterministic `PASS / WARN / N/A` rows expand to reveal their evidence source.
+8. **Load captured example** works from a saved public mainnet receipt and has a stable `?sample=captured` URL. It is visibly labelled as a snapshot, never a live result.
 
 Five additional public mainnet shapes are listed in [VALIDATION_CASES.md](VALIDATION_CASES.md) and linked directly from the interface.
 
@@ -44,7 +45,7 @@ Example: [public mainnet transaction](https://explorer.arc.io/tx/0xb147ec455818b
 
 ## Evidence and tests
 
-25 deterministic tests cover precision/dust, dual streams, repeated equal payments, reverts, malformed logs, duplicate indices, missing fields, mint/burn, health-check states and eight captured public mainnet receipts. Fixtures carry their source and capture date. Passing fixtures is not proof that every possible transaction shape is supported.
+27 deterministic tests cover precision/dust, dual streams, repeated equal payments, reverts, malformed logs, duplicate indices, missing fields, mint/burn, health-check states, address-focus matching and eight captured public mainnet receipts. Fixtures carry their source and capture date. Passing fixtures is not proof that every possible transaction shape is supported.
 
 ## Sources
 

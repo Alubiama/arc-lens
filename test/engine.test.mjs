@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {analyzeReceipt as analyze,assessReceiptHealth as assess,formatUnits,summarizeMovementEffects,SYSTEM_EMITTER as S,USDC as U,TRANSFER_TOPIC as T} from '../engine.mjs';
+import {analyzeReceipt as analyze,assessReceiptHealth as assess,movementMatchesAddress,formatUnits,summarizeMovementEffects,SYSTEM_EMITTER as S,USDC as U,TRANSFER_TOPIC as T} from '../engine.mjs';
 const hash='0x'+'ab'.repeat(32), a='0x'+'11'.repeat(20),b='0x'+'22'.repeat(20);
 const topic=x=>'0x'+x.slice(2).padStart(64,'0');
 const log=(i=0,amount=10n**18n,emitter=S)=>({logIndex:'0x'+i.toString(16),address:emitter,topics:[T,topic(a),topic(b)],data:'0x'+amount.toString(16).padStart(64,'0'),removed:false});
@@ -71,3 +71,7 @@ for(const [i,expected] of [
  assert.equal(f.chainId,5042);assert.match(f.source,/^https:\/\/rpc\.mainnet\.arc\.io/);
  assert.deepEqual({system:x.systemLogCount,erc20:x.erc20LogCount,movements:x.movements.length,transit:x.netEffects.transitCount,recipients:x.netEffects.recipientCount},expected);
 });
+test('address focus matches either movement endpoint exactly',()=>{
+ const movement={from:a,to:b};assert.equal(movementMatchesAddress(movement,a),true);assert.equal(movementMatchesAddress(movement,b.toUpperCase().replace('0X','0x')),true);assert.equal(movementMatchesAddress(movement,'0x'+'33'.repeat(20)),false);
+});
+test('address focus rejects malformed evidence',()=>{assert.throws(()=>movementMatchesAddress({from:a,to:b},'0x1234'));assert.throws(()=>movementMatchesAddress(null,a));});
