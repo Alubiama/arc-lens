@@ -1,0 +1,207 @@
+// Arc Lens - public read-only transaction explainer. No dependencies, no network.
+
+export const SYSTEM_EMITTER = '0xfffffffffffffffffffffffffffffffffffffffe';
+export const USDC = '0x3600000000000000000000000000000000000000';
+export const TRANSFER_TOPIC =
+  '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+
+const ZERO_ADDRESS = '0x' + '0'.repeat(40);
+const MAX_U256 = (1n << 256n) - 1n;
+
+// --- strict quantity / hex helpers -------------------------------------------------
+
+function isHex(s) {
+  return typeof s === 'string' && /^0x[0-9a-fA-F]*$/.test(s);
+}
+
+// RPC quantities have no leading zero; an odd number of nibbles is valid.
+function parseQuantity(v, field) {
+  if (typeof v !== 'string' || !/^0x(0|[1-9a-fA-F][0-9a-fA-F]*)$/.test(v)) {
+    throw new Error(`Invalid ${field}: expected strict 0x quantity`);
+  }
+  return BigInt(v);
+}
+
+function parseTopic(t, field) {
+  if (!isHex(t) || t.length !== 66) {
+    throw new Error(`Invalid ${field}: expected canonical 32-byte topic`);
+  }
+  return t.toLowerCase();
+}
+
+function topicToAddress(topic) {
+  if (!/^0x0{24}/.test(topic)) throw new Error('Noncanonical address topic padding');
+  // last 20 bytes of 32-byte topic
+  return '0x' + topic.slice(2).slice(24);
+}
+
+// --- public API --------------------------------------------------------------------
+
+export function formatUnits(valueBigInt, decimals = 18) {
+  if (typeof valueBigInt !== 'bigint') throw new Error('formatUnits: value must be bigint');
+  if (valueBigInt < 0n) throw new Error('formatUnits: negative amounts are not representable');
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) throw new Error('formatUnits: invalid decimals');
+  const d = BigInt(decimals);
+  const scale = 10n ** d;
+  const whole = valueBigInt / scale;
+  let frac = (valueBigInt % scale).toString().padStart(decimals, '0');
+  frac = frac.replace(/0+$/, '');
+  return frac.length ? `${whole}.${frac}` : whole.toString();
+}
+
+export function analyzeReceipt(receipt) {
+  if (receipt === null || receipt === undefined) {
+    throw new Error('analyzeReceipt: receipt is required (got null/undefined)');
+  }
+  if (typeof receipt !== 'object') {
+    throw new Error('analyzeReceipt: receipt must be an object');
+  }
+
+  const hash = validateHash(receipt.transactionHash ?? receipt.hash);
+  const status = validateStatus(receipt.status);
+  const blockNumber = parseQuantity(receipt.blockNumber, 'blockNumber').toString();
+
+  // fee raw = gasUsed * effectiveGasPrice (native18)
+  const gasUsed = parseQuantity(receipt.gasUsed, 'gasUsed');
+  const effGasPrice = parseQuantity(receipt.effectiveGasPrice, 'effectiveGasPrice');
+  const feeRaw = (gasUsed * effGasPrice).toString();
+  const fee = formatUnits(gasUsed * effGasPrice, 18);
+
+  const logs = receipt.logs;
+  if (!Array.isArray(logs)) {
+    throw new Error('analyzeReceipt: receipt logs are missing or invalid');
+  }
+
+  const movements = [];
+  const warnings = [];
+  const seenIndices = new Set();
+  let systemLogCount = 0;
+  let erc20LogCount = 0;
+
+  for (const log of logs ?? []) {
+    if (log === null || typeof log !== 'object') {
+      throw new Error('analyzeReceipt: each log must be an object');
+    }
+    if (log.removed === true) {
+      throw new Error('analyzeReceipt: removed logs are not valid evidence');
+    }
+    const logIndex = validateLogIndex(log.logIndex);
+    if (seenIndices.has(logIndex)) {
+      throw new Error(`analyzeReceipt: duplicate logIndex ${logIndex}`);
+    }
+
+    const emitter = normalizeAddress(log.address, 'log.address');
+    const topics = log.topics;
+    if (!Array.isArray(topics)) {
+      throw new Error('analyzeReceipt: log.topics must be an array');
+    }
+    const parsedTopics = topics.map((t, i) => parseTopic(t, `topics[${i}]`));
+    const topic0 = parsedTopics[0];
+    if ((emitter === SYSTEM_EMITTER || emitter === USDC) && topic0 === TRANSFER_TOPIC && parsedTopics.length !== 3) {
+      throw new Error('Malformed USDC Transfer topics');
+    }
+    const isTransfer = parsedTopics.length === 3 && topic0 === TRANSFER_TOPIC;
+
+    if (!isTransfer) {
+      seenIndices.add(logIndex);
+      continue; // not a recognized Transfer event
+    }
+
+    if (emitter !== SYSTEM_EMITTER && emitter !== USDC) {
+      seenIndices.add(logIndex);
+      continue;
+    }
+    const data = requireData(log.data);
+    topicToAddress(parsedTopics[1]);
+    topicToAddress(parsedTopics[2]);
+
+    if (emitter === SYSTEM_EMITTER) {
+      seenIndices.add(logIndex);
+      systemLogCount++;
+      const from = topicToAddress(parsedTopics[1]);
+      const to = topicToAddress(parsedTopics[2]);
+      const raw = parseUint256(data, 'system transfer data');
+      const kind = from === ZERO_ADDRESS ? 'mint'
+        : to === ZERO_ADDRESS ? 'burn' : 'transfer';
+      movements.push({
+        from, to,
+        amount: formatUnits(raw, 18),
+        rawAmount: raw.toString(),
+        logIndex,
+        kind,
+      });
+    } else if (emitter === USDC) {
+      seenIndices.add(logIndex);
+      erc20LogCount++;
+    } else {
+      seenIndices.add(logIndex); // unknown emitter ignored (not money)
+    }
+  }
+
+  // Alternate 6-decimal evidence exists but no canonical system events: warn, don't invent.
+  if (erc20LogCount > 0 && systemLogCount === 0) {
+    warnings.push(
+      'ERC20 transfer events present without canonical system-emitter events; ' +
+        'event evidence may be incomplete.'
+    );
+  }
+
+  return {
+    hash,
+    status,
+    blockNumber,
+    fee,
+    feeRaw,
+    movements: status === 'reverted' ? [] : movements.sort((a,b) => a.logIndex-b.logIndex),
+    systemLogCount,
+    erc20LogCount,
+    warnings: status === 'reverted' && logs.length ? [...warnings, 'Reverted receipt contains logs: inconsistent RPC evidence; no movements counted.'] : warnings,
+  };
+}
+
+// --- validation helpers ------------------------------------------------------------
+
+function validateHash(h) {
+  if (typeof h !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(h)) {
+    throw new Error('analyzeReceipt: invalid transactionHash (expected 0x-prefixed 32 bytes)');
+  }
+  return h.toLowerCase();
+}
+
+function validateStatus(s) {
+  const n = parseQuantity(s, 'status');
+  if (n === 1n) return 'success';
+  if (n === 0n) return 'reverted';
+  throw new Error('analyzeReceipt: invalid status (expected 0x0 or 0x1)');
+}
+
+function validateLogIndex(i) {
+  const n = parseQuantity(i, 'logIndex');
+  if (typeof n !== 'number' && typeof n !== 'bigint') {
+    throw new Error('analyzeReceipt: invalid logIndex');
+  }
+  if (BigInt(n) < 0n || BigInt(n) > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error('analyzeReceipt: logIndex out of range');
+  }
+  return Number(n); // logIndex must be a JS number in output
+}
+
+function normalizeAddress(a, field) {
+  if (typeof a !== 'string' || !/^0x[0-9a-fA-F]{40}$/.test(a)) {
+    throw new Error(`analyzeReceipt: invalid ${field} (expected 0x address)`);
+  }
+  return a.toLowerCase();
+}
+
+function requireData(d) {
+  if (!isHex(d) || d.length !== 66) throw new Error('analyzeReceipt: invalid log.data (expected 32-byte word)');
+  return d;
+}
+
+function parseUint256(data, field) {
+  const hex = data.slice(2);
+  if (hex.length === 0 || hex.length > 64) {
+    throw new Error(`analyzeReceipt: invalid ${field} (uint256 word required)`);
+  }
+  return BigInt('0x' + hex);
+}

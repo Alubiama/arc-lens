@@ -1,0 +1,8 @@
+{
+  "name": "arc-lens",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {"test": "node --test test/*.test.mjs"},
+  "description": "Read-only Arc mainnet USDC receipt explainer"
+}

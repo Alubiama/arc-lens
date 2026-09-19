@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arc Lens — One transaction. Every movement.</title>
+<meta name="description" content="Arc Lens is an independent, read-only tool that explains a single Arc transaction: status, fee, and canonical USDC movements. No wallet, no signing.">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="masthead">
+  <div class="wrap masthead__row">
+    <p class="brand">
+      <span class="brand__mark" aria-hidden="true">◆</span>
+      <span class="brand__name">Arc&nbsp;Lens</span>
+      <span class="brand__tag">read-only inspector</span>
+    </p>
+    <nav class="masthead__nav" aria-label="Section">
+      <a href="#inspect">Inspect</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#about">About</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+
+  <section class="hero" aria-labelledby="hero-title">
+    <p class="kicker">Arc mainnet · USDC system events</p>
+    <h1 id="hero-title" class="hero__title">One transaction.<br>Every movement.</h1>
+    <p class="hero__lede">
+      Paste a transaction hash and Arc&nbsp;Lens reads the receipt from a public Arc RPC,
+      then explains <em>what actually moved</em>: status, fee, and every canonical USDC
+      movement — with the raw evidence kept in view.
+    </p>
+    <ul class="hero__facts">
+      <li><strong>Read-only.</strong> No wallet, no signing, no keys.</li>
+      <li><strong>One input.</strong> Only the transaction hash is required.</li>
+      <li><strong>No account.</strong> Your query goes directly to the public Arc RPC.</li>
+    </ul>
+  </section>
+
+  <section id="inspect" class="panel" aria-labelledby="inspect-title">
+    <h2 id="inspect-title" class="panel__title">Explain a transaction</h2>
+
+    <form id="tx-form" class="form" novalidate>
+      <div class="field">
+        <label for="tx-hash">Transaction hash</label>
+        <input
+          id="tx-hash"
+          name="tx-hash"
+          type="text"
+          inputmode="text"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          placeholder="0x… (66 characters)"
+          aria-describedby="tx-hint tx-error"
+          required>
+        <p id="tx-hint" class="hint">A 32-byte hash: <code>0x</code> followed by 64 hex characters.</p>
+        <p id="tx-error" class="error" role="alert" hidden></p>
+      </div>
+
+      <div class="form__actions">
+        <button type="submit" id="submit-live" class="btn btn--primary">
+          <span class="btn__label">Explain transaction</span>
+          <span class="btn__spin" aria-hidden="true"></span>
+        </button>
+        <button type="button" id="btn-example" class="btn btn--ghost">Try mainnet example</button>
+        <button type="button" id="btn-captured" class="btn btn--ghost">Load captured example</button>
+      </div>
+    </form>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section id="result-region" class="result-region" aria-label="Transaction result" hidden></section>
+
+  <section id="evidence" class="panel panel--muted" aria-labelledby="evidence-title">
+    <h2 id="evidence-title" class="panel__title">Why two event streams are not two payments</h2>
+    <p class="prose">
+      Arc emits <strong>USDC system events</strong> from the system emitter, and can also
+      carry <strong>ERC-20 Transfer</strong> logs from the USDC token contract. These two
+      streams can describe the <em>same</em> underlying movement twice, in two encodings.
+      Arc&nbsp;Lens counts only the verified system-emitter transfers as canonical movements,
+      and treats the ERC-20 logs as alternative supporting evidence — never as extra
+      movements, and never by summing both or by pairing logs that merely share an amount.
+      Same-amount transfers that are genuinely distinct stay distinct because each carries
+      its own log index.
+    </p>
+    <p class="prose">
+      When a receipt carries ERC-20 transfer logs but no verified system transfers,
+      Arc&nbsp;Lens flags the event evidence as incomplete instead of inventing a movement.
+      A reverted transaction moves no funds, though its fee is still charged.
+    </p>
+  </section>
+
+  <section id="about" class="panel" aria-labelledby="about-title">
+    <h2 id="about-title" class="panel__title">About this tool</h2>
+    <ul class="about__list">
+      <li>Arc&nbsp;Lens performs no signing, holds no wallet, and runs no server.</li>
+      <li>It collects no private data; the only input it needs is a transaction hash.</li>
+      <li>It explains USDC events, not other tokens, trade outcomes or a wallet’s full balance history.</li>
+      <li>Numbers come straight from the receipt; fee and amounts are explained separately.</li>
+    </ul>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__row">
+    <p>Independent source-available tool. Not affiliated with Circle.</p>
+    <p class="footer__links">
+      <a href="https://github.com/Alubiama/arc-lens" target="_blank" rel="noopener noreferrer">Source on GitHub ↗</a>
+    </p>
+  </div>
+</footer>
+
+<script type="module" src="./app.mjs"></script>
+</body>
+</html>
