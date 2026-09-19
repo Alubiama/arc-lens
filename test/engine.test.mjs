@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {analyzeReceipt as analyze,formatUnits,SYSTEM_EMITTER as S,USDC as U,TRANSFER_TOPIC as T} from '../engine.mjs';
+import {analyzeReceipt as analyze,formatUnits,summarizeMovementEffects,SYSTEM_EMITTER as S,USDC as U,TRANSFER_TOPIC as T} from '../engine.mjs';
 const hash='0x'+'ab'.repeat(32), a='0x'+'11'.repeat(20),b='0x'+'22'.repeat(20);
 const topic=x=>'0x'+x.slice(2).padStart(64,'0');
 const log=(i=0,amount=10n**18n,emitter=S)=>({logIndex:'0x'+i.toString(16),address:emitter,topics:[T,topic(a),topic(b)],data:'0x'+amount.toString(16).padStart(64,'0'),removed:false});
@@ -26,3 +26,18 @@ test('three saved mainnet receipts agree with independently counted system event
   assert.equal(x.movements.length,events.length);assert.equal(x.feeRaw,(BigInt(r.gasUsed)*BigInt(r.effectiveGasPrice)).toString());assert.equal(f.chainId,5042);
  }
 });
+test('net effects collapse a multi-hop path without losing endpoints',()=>{
+ const x=analyze(receipt([log(0),{...log(1),topics:[T,topic(b),topic('0x'+'33'.repeat(20))]}]));
+ assert.equal(x.netEffects.sourceCount,1);assert.equal(x.netEffects.recipientCount,1);assert.equal(x.netEffects.transitCount,1);
+ assert.equal(x.netEffects.participants.find(p=>p.address===b).role,'transit');
+});
+test('net effects preserve repeated payments and exact dust',()=>{
+ const x=summarizeMovementEffects([{from:a,to:b,rawAmount:'1'},{from:a,to:b,rawAmount:'1'}]);
+ const source=x.participants.find(p=>p.address===a),recipient=x.participants.find(p=>p.address===b);
+ assert.equal(source.net,'-0.000000000000000002');assert.equal(recipient.net,'+0.000000000000000002');assert.equal(source.movementCount,2);
+});
+test('mint and burn affect supply without treating zero address as a participant',()=>{
+ const z='0x'+'0'.repeat(40);const x=summarizeMovementEffects([{from:z,to:a,rawAmount:'5'},{from:a,to:z,rawAmount:'2'}]);
+ assert.equal(x.participants.length,1);assert.equal(x.participants[0].net,'+0.000000000000000003');assert.equal(x.supply.net,'+0.000000000000000003');
+});
+test('reverted receipts expose no net effects',()=>{const r=receipt([log()]);r.status='0x0';const x=analyze(r);assert.equal(x.netEffects.participants.length,0);assert.equal(x.netEffects.supply.net,'0');});

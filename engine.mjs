@@ -49,6 +49,70 @@ export function formatUnits(valueBigInt, decimals = 18) {
   return frac.length ? `${whole}.${frac}` : whole.toString();
 }
 
+function formatSignedUnits(valueBigInt) {
+  if (valueBigInt === 0n) return '0';
+  return `${valueBigInt > 0n ? '+' : '-'}${formatUnits(valueBigInt > 0n ? valueBigInt : -valueBigInt)}`;
+}
+
+export function summarizeMovementEffects(movements) {
+  if (!Array.isArray(movements)) throw new Error('summarizeMovementEffects: movements must be an array');
+  const accounts = new Map();
+  let mintedRaw = 0n;
+  let burnedRaw = 0n;
+
+  function account(address) {
+    if (!accounts.has(address)) accounts.set(address, {address, inflow: 0n, outflow: 0n, movementCount: 0});
+    return accounts.get(address);
+  }
+
+  for (const movement of movements) {
+    if (!movement || typeof movement !== 'object') throw new Error('summarizeMovementEffects: invalid movement');
+    const from = normalizeAddress(movement.from, 'movement.from');
+    const to = normalizeAddress(movement.to, 'movement.to');
+    if (typeof movement.rawAmount !== 'string' || !/^(0|[1-9][0-9]*)$/.test(movement.rawAmount)) {
+      throw new Error('summarizeMovementEffects: invalid rawAmount');
+    }
+    const amount = BigInt(movement.rawAmount);
+    if (from === ZERO_ADDRESS) mintedRaw += amount;
+    else { const entry = account(from); entry.outflow += amount; entry.movementCount++; }
+    if (to === ZERO_ADDRESS) burnedRaw += amount;
+    else { const entry = account(to); entry.inflow += amount; entry.movementCount++; }
+  }
+
+  const roleOrder = {source: 0, recipient: 1, transit: 2};
+  const participants = [...accounts.values()].map(entry => {
+    const net = entry.inflow - entry.outflow;
+    const role = net < 0n ? 'source' : net > 0n ? 'recipient' : 'transit';
+    return {
+      address: entry.address,
+      role,
+      movementCount: entry.movementCount,
+      inflowRaw: entry.inflow.toString(),
+      outflowRaw: entry.outflow.toString(),
+      netRaw: net.toString(),
+      inflow: formatUnits(entry.inflow),
+      outflow: formatUnits(entry.outflow),
+      net: formatSignedUnits(net),
+    };
+  }).sort((a, b) => roleOrder[a.role] - roleOrder[b.role] || a.address.localeCompare(b.address));
+
+  const supplyChange = mintedRaw - burnedRaw;
+  return {
+    participants,
+    sourceCount: participants.filter(item => item.role === 'source').length,
+    recipientCount: participants.filter(item => item.role === 'recipient').length,
+    transitCount: participants.filter(item => item.role === 'transit').length,
+    supply: {
+      mintedRaw: mintedRaw.toString(),
+      burnedRaw: burnedRaw.toString(),
+      netRaw: supplyChange.toString(),
+      minted: formatUnits(mintedRaw),
+      burned: formatUnits(burnedRaw),
+      net: formatSignedUnits(supplyChange),
+    },
+  };
+}
+
 export function analyzeReceipt(receipt) {
   if (receipt === null || receipt === undefined) {
     throw new Error('analyzeReceipt: receipt is required (got null/undefined)');
@@ -146,13 +210,15 @@ export function analyzeReceipt(receipt) {
     );
   }
 
+  const canonicalMovements = status === 'reverted' ? [] : movements.sort((a,b) => a.logIndex-b.logIndex);
   return {
     hash,
     status,
     blockNumber,
     fee,
     feeRaw,
-    movements: status === 'reverted' ? [] : movements.sort((a,b) => a.logIndex-b.logIndex),
+    movements: canonicalMovements,
+    netEffects: summarizeMovementEffects(canonicalMovements),
     systemLogCount,
     erc20LogCount,
     warnings: status === 'reverted' && logs.length ? [...warnings, 'Reverted receipt contains logs: inconsistent RPC evidence; no movements counted.'] : warnings,

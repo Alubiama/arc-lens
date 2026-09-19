@@ -22,8 +22,9 @@ The browser connects directly to `https://rpc.mainnet.arc.io`, verifies chain ID
 2. The example has 8 system-emitter movements and 4 ERC-20 logs: 8 canonical movements, not 12. The fee is **0.059403855 USDC**, accounted for separately.
    The result renders this as a visible `12 event records → 8 canonical movements` check so the core failure mode is reproducible at a glance.
 3. Inspect every from/to/amount/log index. Equal-value movements are preserved, not merged heuristically.
-4. Expand the raw receipt or download a JSON bundle containing the receipt, analysis, network and retrieval provenance.
-5. **Load captured example** works from a saved public mainnet receipt. It is visibly labelled as a snapshot, never a live result.
+4. Review **Net USDC effects** to separate net sources and recipients from zero-net transit addresses. This summary is derived only from canonical movements; network fee remains separate.
+5. Copy a shareable `?tx=` URL or expand the raw receipt and download a JSON bundle containing the receipt, analysis, network and retrieval provenance.
+6. **Load captured example** works from a saved public mainnet receipt and has a stable `?sample=captured` URL. It is visibly labelled as a snapshot, never a live result.
 
 Example: [public mainnet transaction](https://explorer.arc.io/tx/0xb147ec455818b74b6511e905abc6f56e15c189432f3c0e98b397108e6916d8e3).
 

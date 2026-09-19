@@ -8,6 +8,28 @@ let busy=false, bundle=null;
 function node(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
 function link(text,url){const a=node('a',text);a.href=url;a.target='_blank';a.rel='noopener noreferrer';return a;}
 function metric(label,value){const e=node('div',undefined,'metric');e.append(node('span',label,'label'),node('strong',value));return e;}
+function shareURL(mode,hash){const url=new URL(window.location.href);url.search='';if(mode==='live')url.searchParams.set('tx',hash);else url.searchParams.set('sample','captured');return url.toString();}
+function shortAddress(address){return `${address.slice(0,8)}…${address.slice(-6)}`;}
+async function copyText(text){
+ if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);return;}
+ const area=node('textarea');area.value=text;area.setAttribute('readonly','');area.style.position='fixed';area.style.opacity='0';document.body.append(area);area.select();
+ const copied=document.execCommand('copy');area.remove();if(!copied)throw Error('Copy failed');
+}
+function effectRow(effect){
+ const row=node('li',undefined,`effect-row effect-row--${effect.role}`);
+ const identity=node('div');identity.append(node('span',effect.role.toUpperCase(),'label'),node('code',shortAddress(effect.address),'effect-address'));identity.querySelector('code').title=effect.address;
+ const values=node('div',undefined,'effect-values');values.append(node('strong',`${effect.net} USDC`),node('span',`in ${effect.inflow} · out ${effect.outflow}`));row.append(identity,values);return row;
+}
+function renderNetEffects(report){
+ const effects=report.netEffects;if(!effects.participants.length)return null;
+ const section=node('section',undefined,'net-effects');section.setAttribute('aria-labelledby','net-effects-title');
+ const title=node('h3','Net USDC effects','net-effects__title');title.id='net-effects-title';section.append(node('p','RECEIPT-LEVEL NET FLOW','kicker'),title);
+ const summary=node('div',undefined,'net-effects__summary');summary.append(metric('SOURCES',String(effects.sourceCount)),metric('RECIPIENTS',String(effects.recipientCount)),metric('TRANSIT',String(effects.transitCount)));section.append(summary);
+ const primary=node('ul',undefined,'effect-list');effects.participants.filter(item=>item.role!=='transit').forEach(item=>primary.append(effectRow(item)));section.append(primary);
+ const transit=effects.participants.filter(item=>item.role==='transit');if(transit.length){const details=node('details',undefined,'transit-details');details.append(node('summary',`${transit.length} zero-net transit ${transit.length===1?'address':'addresses'}`));const list=node('ul',undefined,'effect-list');transit.forEach(item=>list.append(effectRow(item)));details.append(list);section.append(details);}
+ if(effects.supply.mintedRaw!=='0'||effects.supply.burnedRaw!=='0')section.append(node('p',`Supply events: minted ${effects.supply.minted} USDC · burned ${effects.supply.burned} USDC · net ${effects.supply.net} USDC.`,'net-effects__note'));
+ section.append(node('p','Derived only from canonical system-emitter movements in this receipt. Network fee is excluded and shown separately.','net-effects__note'));return section;
+}
 function renderStreamProof(report){
  if(report.status!=='success'||!report.systemLogCount||!report.erc20LogCount)return null;
  const total=report.systemLogCount+report.erc20LogCount;
@@ -27,7 +49,8 @@ async function rpc(method,params,signal){
 }
 function render(receipt,source){
  const report=analyzeReceipt(receipt);
- bundle={tool:'Arc Lens',version:'0.1.0',chainId:5042,source,analysis:report,receipt};
+ const shareUrl=shareURL(source.mode,report.hash);history.replaceState(null,'',shareUrl);
+ bundle={tool:'Arc Lens',version:'0.2.0',chainId:5042,source:{...source,shareUrl},analysis:report,receipt};
  result.replaceChildren();result.hidden=false;
  const header=node('div',undefined,'result-heading');header.append(node('p',source.mode==='live'?'FETCHED FROM ARC MAINNET':'CAPTURED SNAPSHOT','kicker'),link('Open in explorer ↗',`https://explorer.arc.io/tx/${report.hash}`));result.append(header);
  result.append(node('h2',report.status==='success'?'The receipt, made readable.':'Transaction reverted.','result-title'));
@@ -38,12 +61,13 @@ function render(receipt,source){
  for(const warning of report.warnings)result.append(node('p',warning,'warning'));
  const proof=renderStreamProof(report);if(proof)result.append(proof);
  const stream=node('div',undefined,'stream-note');stream.append(node('strong',`${report.systemLogCount} system logs · ${report.erc20LogCount} ERC-20 logs`),node('p','Only system-emitter transfers count as movements. ERC-20 logs are another view, not extra money. No equal-amount transfers are merged.'));result.append(stream);
+ const effects=renderNetEffects(report);if(effects)result.append(effects);
  result.append(node('h3','Canonical USDC movements'));
  if(!report.movements.length)result.append(node('p',report.status==='reverted'?'No completed USDC movements: execution reverted.':'No canonical USDC movements were found in this receipt. Other assets and approvals are outside this view.','empty-result'));
  const list=node('ol',undefined,'movements');
  report.movements.forEach(m=>{const row=node('li');const top=node('div',undefined,'movement-top');top.append(node('span',`${m.kind.toUpperCase()} · LOG ${m.logIndex}`,'label'),node('strong',`${m.amount} USDC`));row.append(top,node('p',`From  ${m.from}`,'address'),node('p',`To      ${m.to}`,'address'));list.append(row);});result.append(list);
  const details=node('details',undefined,'raw');details.append(node('summary','Inspect the raw RPC receipt'),node('pre',JSON.stringify(receipt,null,2)));result.append(details);
- const actions=node('div',undefined,'evidence-actions');const download=node('button','Download evidence JSON','btn btn--primary');download.type='button';download.addEventListener('click',()=>{const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=node('a');a.href=url;a.download=`arc-lens-${report.hash.slice(2,14)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});actions.append(download,link('Read Arc’s event specification ↗','https://docs.arc.io/arc/references/usdc-system-events'));result.append(actions);
+ const actions=node('div',undefined,'evidence-actions');const download=node('button','Download evidence JSON','btn btn--primary');download.type='button';download.addEventListener('click',()=>{const blob=new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=node('a');a.href=url;a.download=`arc-lens-${report.hash.slice(2,14)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});const copy=node('button','Copy shareable link','btn btn--ghost');copy.type='button';copy.addEventListener('click',async()=>{try{await copyText(shareUrl);status.textContent='Shareable link copied.';}catch{status.textContent='Could not copy the link. Copy it from the address bar.';}});actions.append(download,copy,link('Read Arc’s event specification ↗','https://docs.arc.io/arc/references/usdc-system-events'));result.append(actions);
 }
 async function load(mode){
  if(busy)return;
@@ -70,3 +94,5 @@ async function load(mode){
 form.addEventListener('submit',e=>{e.preventDefault();load('live');});
 $('btn-example').addEventListener('click',()=>{input.value=EXAMPLE;load('live');});
 $('btn-captured').addEventListener('click',()=>load('captured'));
+const params=new URLSearchParams(window.location.search);const linkedTx=params.get('tx');
+if(linkedTx!==null){input.value=linkedTx;load('live');}else if(params.get('sample')==='captured')load('captured');
